@@ -1,0 +1,39 @@
+services:
+  openbao:
+    image: openbao/openbao:2.3.1
+    container_name: openbao-server
+    cap_add:
+      - IPC_LOCK # Required for OpenBao to prevent memory from being swapped to disk
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./config:/openbao/config
+      - ./data:/openbao/file
+      - ./logs:/openbao/logs
+    environment:
+      # Set BAO_LOCAL_CONFIG for initial configuration.
+      # For production, it's better to use a dedicated HCL config file.
+      BAO_LOCAL_CONFIG: |
+        storage "file" {
+          path = "/openbao/file"
+        }
+        listener "tcp" {
+          address = "0.0.0.0:8200"
+          tls_disable = true # Disable TLS for simplicity in dev. ENABLE FOR PRODUCTION!
+        }
+        ui = true
+    # For development, you can use -dev flag for an in-memory instance
+    # command: server -dev -dev-root-token-id="dev-root-token"
+    # The default entrypoint typically starts `server` if no command is given.
+    command: "server"
+    healthcheck:
+      test: ["CMD", "bao", "status", "-tls-skip-verify"] # Adjust if TLS is enabled
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  default:
+    name: nginx-proxy
+    external: true
