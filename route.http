@@ -1,0 +1,107 @@
+@token = {{$dotenv OPENBAO_TOKEN}}
+@host = {{$dotenv OPENBAO_ADDR}}
+@contentType = application/json
+@namespace=my-namespace
+@enginePath=secret
+@policyName={{namespace}}-policy
+@roleName=my-app-role
+@timestamp = {{$datetime rfc1123}}
+
+### Create a namespace
+POST {{host}}/v1/sys/namespaces/{{namespace}}
+X-Vault-Token: {{token}}
+
+### Get namespace
+GET {{host}}/v1/sys/namespaces/{{namespace}}
+X-Vault-Token: {{token}}
+
+### Enable secret engine
+POST {{host}}/v1/sys/mounts/{{enginePath}}
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+Content-Type: {{contentType}}
+
+{
+    "type": "kv",
+    "options": {
+        "version": "2"
+    }
+}
+
+### Store secret
+PUT {{host}}/v1/secret/data/{{namespace}}
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+Content-Type: {{contentType}}
+
+{
+  "data": {
+    "username": "admin",
+    "password": "s3cr3t"
+  }
+}
+
+### Get secret
+GET {{host}}/v1/secret/data/{{namespace}}
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+
+### Enable auth method approle
+POST {{host}}/v1/sys/auth/approle
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+Content-Type: {{contentType}}
+
+{
+    "type": "approle"
+}
+
+### Create policy
+PUT {{host}}/v1/sys/policies/acl/{{policyName}}
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+Content-Type: {{contentType}}
+
+{
+    "policy": "path \"secret/data/{{namespace}}\" {\n    capabilities = [\"read\", \"create\", \"update\"]\n}"
+}
+
+### Create role
+POST {{host}}/v1/auth/approle/role/{{roleName}}
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+Content-Type: {{contentType}}
+
+{
+    "policies": ["{{policyName}}"],
+    "token_ttl": "10m",
+    "token_max_ttl": "15m"
+}
+
+### Get role_id
+# @name approle_role
+GET {{host}}/v1/auth/approle/role/{{roleName}}/role-id
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+
+### Get secret_id
+# @name approle_secret
+POST {{host}}/v1/auth/approle/role/{{roleName}}/secret-id
+X-Vault-Token: {{token}}
+X-Vault-Namespace: {{namespace}}
+
+### Get token
+# @name approle_token
+POST {{host}}/v1/auth/approle/login
+X-Vault-Namespace: {{namespace}}
+Content-Type: {{contentType}}
+
+{
+    "role_id": "{{approle_role.response.body.data.role_id}}",
+    "secret_id": "{{approle_secret.response.body.data.secret_id}}"
+}
+
+### Get secret using approle token
+GET {{host}}/v1/secret/data/{{namespace}}
+X-Vault-Token: {{approle_token.response.body.auth.client_token}}
+X-Vault-Namespace: {{namespace}}

@@ -18,6 +18,12 @@ You can then access the WebUI through the following URL:
 
 **NOTE** The `root` unseal keys and root token will be generate on first login.
 
+## Using the Admin API
+
+Refer to [sample.sh](sample.sh) on how to create namespace, policy, approle and secret
+
+Refer to [route.http](route.http) on how to interact wit the Admin API.
+
 ## Sequence
 
 ### Unseal and login
@@ -97,6 +103,14 @@ Unseal server based on the number of unseal keys you have.
 Seal the server
 
     bao operator seal
+
+## Unseal server using `unseal.sh`
+
+The script uses values stored in `.env`
+
+```bash
+./unseal.sh
+```
 
 ## Create policy
 
@@ -244,16 +258,24 @@ Remove Secret Engine
 
     bao secrets disable team-a/secret
 
-## Layers of Abstraction
+## Relationship
 
 ```mermaid
-graph TD
-    subgraph "OpenBao"
-        subgraph "namespace"
-            subgraph "secret"
-                keyValue[key = value]
-            end
-        end
-        policy
-    end
+graph
+    namespace(Namespace)
+    auth_method(Auth Method)
+    app_role(App Role)
+    jwt(JWT)
+    token(Token)
+    policy(Policy)
+    path(Path)
+    secret(Secret)
+
+    namespace ---> auth_method
+    namespace ---> path
+    auth_method ---> jwt
+    auth_method ---> app_role
+    policy -- access rules for --> path
+    token -- to access --> path
+    path ---> secret
 ```
